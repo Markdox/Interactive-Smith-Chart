@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smith Chart Interattiva Avanzata - RF & Microonde</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0b0f19;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+    .font-mono-code {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Custom scrollbars for RF instrument aesthetics */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
+    }
+    /* Instrument panel glow */
+    .instrument-glow {
+      box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.15), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+    }
+    .chart-container {
+      position: relative;
+      touch-action: none;
+    }
+    input[type=range] {
+      accent-color: #06b6d4;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-cyan-500 selection:text-black">
+
+  <header class="border-b border-slate-800/80 bg-slate-900/60 backdrop-blur px-5 py-3 sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <div class="h-9 w-9 rounded-lg bg-gradient-to-tr from-cyan-600 to-teal-400 flex items-center justify-center shadow-lg shadow-cyan-900/30">
+        <svg class="w-5 h-5 text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 2a10 10 0 0 1 10 10" />
+          <path d="M12 12m-6 0a6 6 0 1 0 12 0a6 6 0 1 0 -12 0" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-base font-bold tracking-tight text-white flex items-center gap-2">
+          SmithLab Pro <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800/60">RF v2.4</span>
+        </h1>
+        <p class="text-xs text-slate-400 font-mono-code">Vector Network Analyzer & Impedance Smith Chart</p>
+      </div>
+    </div>
+
+    <!-- Quick global parameters -->
+    <div class="flex items-center gap-4 text-xs font-mono-code">
+      <div class="flex items-center gap-2 bg-slate-800/70 border border-slate-700/60 px-3 py-1.5 rounded-lg">
+        <span class="text-slate-400 font-medium">Z₀:</span>
+        <input type="number" id="z0-input" value="50" min="1" max="1000" step="1" 
+          class="w-16 bg-slate-900 border border-slate-600 rounded px-1.5 py-0.5 text-cyan-300 font-bold text-center focus:outline-none focus:border-cyan-400">
+        <span class="text-slate-400">Ω</span>
+      </div>
+      <div class="flex items-center gap-2 bg-slate-800/70 border border-slate-700/60 px-3 py-1.5 rounded-lg">
+        <span class="text-slate-400 font-medium">Freq:</span>
+        <input type="number" id="freq-input" value="1000" min="1" max="50000" step="10" 
+          class="w-20 bg-slate-900 border border-slate-600 rounded px-1.5 py-0.5 text-cyan-300 font-bold text-center focus:outline-none focus:border-cyan-400">
+        <span class="text-slate-400">MHz</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-[1720px] w-full mx-auto p-3 lg:p-5 grid grid-cols-1 xl:grid-cols-12 gap-5">
+    
+    <!-- LEFT & CENTER: Smith Chart Canvas Workspace (xl:col-span-8) -->
+    <section class="xl:col-span-8 flex flex-col gap-3">
+      <div class="bg-slate-900/80 rounded-2xl border border-slate-800 instrument-glow p-4 flex flex-col h-full relative">
+        <!-- Interactive Chart Controls Toolbar -->
+        <div class="flex flex-wrap items-center justify-between pb-3 border-b border-slate-800/80 gap-3 text-xs">
+          <!-- View Toggles -->
+          <div class="flex items-center gap-2">
+            <span class="text-slate-400 font-medium mr-1">Layer:</span>
+            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-800/80 hover:bg-slate-750 px-2.5 py-1 rounded-md border border-slate-700 select-none">
+              <input type="checkbox" id="toggle-z-chart" checked class="rounded bg-slate-900 text-cyan-500 focus:ring-0">
+              <span class="text-cyan-400 font-semibold">Z-Chart (Impedenza)</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-800/80 hover:bg-slate-750 px-2.5 py-1 rounded-md border border-slate-700 select-none">
+              <input type="checkbox" id="toggle-y-chart" class="rounded bg-slate-900 text-pink-500 focus:ring-0">
+              <span class="text-rose-400 font-semibold">Y-Chart (Ammettenza)</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-800/80 hover:bg-slate-750 px-2.5 py-1 rounded-md border border-slate-700 select-none">
+              <input type="checkbox" id="toggle-vswr-circle" checked class="rounded bg-slate-900 text-amber-500 focus:ring-0">
+              <span class="text-amber-400 font-medium">Cerchio VSWR</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-800/80 hover:bg-slate-750 px-2.5 py-1 rounded-md border border-slate-700 select-none">
+              <input type="checkbox" id="toggle-labels" checked class="rounded bg-slate-900 text-emerald-500 focus:ring-0">
+              <span class="text-slate-300">Etichette</span>
+            </label>
+          </div>
+
+          <!-- Quick Presets -->
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-slate-400 mr-1">Preset:</span>
+            <button class="preset-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-900/50 hover:text-cyan-300 border border-slate-700 text-slate-300 font-mono-code transition" data-r="50" data-x="0">50Ω Adattato</button>
+            <button class="preset-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-900/50 hover:text-cyan-300 border border-slate-700 text-slate-300 font-mono-code transition" data-r="0" data-x="0">Corto (0Ω)</button>
+            <button class="preset-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-900/50 hover:text-cyan-300 border border-slate-700 text-slate-300 font-mono-code transition" data-r="99999" data-x="0">Aperto (∞)</button>
+            <button class="preset-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-900/50 hover:text-cyan-300 border border-slate-700 text-slate-300 font-mono-code transition" data-r="25" data-x="0">25Ω</button>
+            <button class="preset-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-900/50 hover:text-cyan-300 border border-slate-700 text-slate-300 font-mono-code transition" data-r="100" data-x="0">100Ω</button>
+            <button class="preset-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-900/50 hover:text-cyan-300 border border-slate-700 text-slate-300 font-mono-code transition" data-r="0" data-x="50">+j50Ω (Ind)</button>
+            <button class="preset-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-900/50 hover:text-cyan-300 border border-slate-700 text-slate-300 font-mono-code transition" data-r="0" data-x="-50">-j50Ω (Cap)</button>
+          </div>
+        </div>
+
+        <div class="flex-1 flex items-center justify-center min-h-[460px] md:min-h-[580px] w-full p-2 relative select-none">
+          <div class="chart-container w-full h-full flex items-center justify-center">
+            <canvas id="smithCanvas" class="w-full h-full max-w-[660px] max-h-[660px] cursor-crosshair rounded-full shadow-2xl"></canvas>
+            <!-- Floating readout HUD on top-left of canvas -->
+            <div class="absolute top-2 left-2 bg-slate-900/90 border border-slate-800/90 p-2.5 rounded-lg backdrop-blur font-mono-code text-[11px] space-y-1 pointer-events-none hidden sm:block">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+                <span class="text-slate-400">Z:</span>
+                <span id="hud-z" class="text-white font-semibold">50.0 + j0.0 Ω</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                <span class="text-slate-400">|Γ|∠θ:</span>
+                <span id="hud-gamma" class="text-amber-300 font-semibold">0.000 ∠ 0.0°</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-400"></span>
+                <span class="text-slate-400">VSWR:</span>
+                <span id="hud-vswr" class="text-rose-300 font-semibold">1.000</span>
+              </div>
+            </div>
+            <!-- Interactive tooltip / drag indicator -->
+            <div id="drag-tooltip" class="absolute pointer-events-none transform -translate-x-1/2 -translate-y-9 opacity-0 transition-opacity bg-cyan-950/90 text-cyan-200 border border-cyan-500/50 text-[10px] font-mono-code px-2 py-0.5 rounded shadow">
+              Trascina per variare carico
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Chart Note -->
+        <div class="flex flex-wrap items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800/80">
+          <span class="flex items-center gap-1.5">
+            <span class="inline-block w-2 h-2 rounded-full bg-cyan-400"></span> Cerchi R/G costanti (blu/rosa)
+            <span class="inline-block w-2 h-2 rounded-full bg-cyan-500/50 ml-2"></span> Archi X/B costanti
+            <span class="inline-block w-2 h-2 rounded-full bg-amber-400 ml-2"></span> Cerchio |Γ| (VSWR)
+          </span>
+          <span class="font-mono-code text-slate-400">Tasto SX mouse o Touch: posiziona / trascina il carico</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: Parameters, RF Calculations & Matching Network (xl:col-span-4) -->
+    <section class="xl:col-span-4 flex flex-col gap-4">
+      
+      <!-- Live Metrics Dashboard -->
+      <div class="bg-slate-900/80 rounded-2xl border border-slate-800 p-4 instrument-glow">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center justify-between">
+          <span>Parametri RF in Tempo Reale</span>
+          <span class="text-[10px] text-emerald-400 font-mono-code flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ONLINE
+          </span>
+        </h2>
+
+        <div class="grid grid-cols-2 gap-2.5 font-mono-code">
+          <!-- Impedance Card -->
+          <div class="bg-slate-950/70 border border-slate-800 p-2.5 rounded-xl">
+            <div class="text-[11px] text-slate-400 mb-1">Impedenza Totale Z</div>
+            <div id="metric-z" class="text-sm font-bold text-cyan-300">50.0 + j0.0 Ω</div>
+            <div id="metric-znorm" class="text-[11px] text-slate-400">z = 1.000 + j0.000</div>
+          </div>
+
+          <!-- Admittance Card -->
+          <div class="bg-slate-950/70 border border-slate-800 p-2.5 rounded-xl">
+            <div class="text-[11px] text-slate-400 mb-1">Ammettenza Totale Y</div>
+            <div id="metric-y" class="text-sm font-bold text-rose-300">20.0 + j0.0 mS</div>
+            <div id="metric-ynorm" class="text-[11px] text-slate-400">y = 1.000 + j0.000</div>
+          </div>
+
+          <!-- Reflection Coefficient -->
+          <div class="bg-slate-950/70 border border-slate-800 p-2.5 rounded-xl">
+            <div class="text-[11px] text-slate-400 mb-1">Coeff. Riflessione Γ (S₁₁)</div>
+            <div id="metric-gamma-mag" class="text-sm font-bold text-amber-300">|Γ| = 0.0000</div>
+            <div id="metric-gamma-phase" class="text-[11px] text-slate-400">∠θ = 0.0°</div>
+          </div>
+
+          <!-- VSWR & Return Loss -->
+          <div class="bg-slate-950/70 border border-slate-800 p-2.5 rounded-xl">
+            <div class="text-[11px] text-slate-400 mb-1">VSWR & Return Loss</div>
+            <div id="metric-vswr" class="text-sm font-bold text-emerald-400">VSWR = 1.00</div>
+            <div id="metric-rl" class="text-[11px] text-slate-400">RL = ∞ dB</div>
+          </div>
+
+          <!-- Equivalent Component Values at freq -->
+          <div class="bg-slate-950/70 border border-slate-800 p-2.5 rounded-xl col-span-2 flex items-center justify-between">
+            <div>
+              <div class="text-[11px] text-slate-400">Componente Reattivo Eq.</div>
+              <div id="metric-eq-component" class="text-xs font-semibold text-purple-300">Nessuno (Resistivo Puro)</div>
+            </div>
+            <div class="text-right">
+              <div class="text-[11px] text-slate-400">Disadattamento (Mismatch Loss)</div>
+              <div id="metric-mismatch" class="text-xs font-semibold text-slate-300">0.00 dB</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 rounded-2xl border border-slate-800 p-4 instrument-glow">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Impostazione Manuale Carico ZL</h2>
+
+        <div class="space-y-3 font-mono-code text-xs">
+          <!-- Real Part R -->
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>Resistenza R (Ω):</span>
+              <span id="slider-r-val" class="text-cyan-300 font-bold">50.0 Ω</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <input type="range" id="slider-r" min="0" max="300" step="0.5" value="50" class="w-full">
+              <input type="number" id="num-r" min="0" max="10000" step="0.5" value="50" 
+                class="w-20 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-right text-cyan-300 focus:outline-none focus:border-cyan-400">
+            </div>
+          </div>
+
+          <!-- Imaginary Part X -->
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>Reattanza X (Ω):</span>
+              <span id="slider-x-val" class="text-cyan-300 font-bold">0.0 Ω</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <input type="range" id="slider-x" min="-250" max="250" step="0.5" value="0" class="w-full">
+              <input type="number" id="num-x" min="-10000" max="10000" step="0.5" value="0" 
+                class="w-20 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-right text-cyan-300 focus:outline-none focus:border-cyan-400">
+            </div>
+          </div>
+
+          <!-- Direct Gamma input -->
+          <div class="pt-2 border-t border-slate-800/80 grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">|Γ| (Modulo 0..1):</label>
+              <input type="number" id="num-gamma-mag" min="0" max="1" step="0.01" value="0.0" 
+                class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-amber-300 focus:outline-none focus:border-amber-400">
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">Fase ∠θ (-180°..180°):</label>
+              <input type="number" id="num-gamma-ang" min="-180" max="180" step="1" value="0" 
+                class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-amber-300 focus:outline-none focus:border-amber-400">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 rounded-2xl border border-slate-800 p-4 instrument-glow flex-1 flex flex-col">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Rete di Adattamento (Matching Trajectory)</h2>
+          <button id="btn-clear-network" class="text-[11px] text-rose-400 hover:text-rose-300 transition">Svuota Rete</button>
+        </div>
+        <p class="text-[11px] text-slate-400 mb-3">
+          Aggiungi componenti reattivi o tratti di linea per osservare lo spostamento (traiettoria) dell'impedenza verso il centro della carta (adattamento a Z₀).
+        </p>
+
+        <!-- Element insertion form -->
+        <div class="grid grid-cols-3 gap-2 mb-3">
+          <button id="btn-add-series-l" class="p-2 rounded-lg bg-slate-800/90 hover:bg-slate-750 border border-slate-700 text-left text-xs transition flex flex-col gap-1">
+            <span class="font-bold text-cyan-400">+ L Serie</span>
+            <span class="text-[10px] text-slate-400">Arco orario R cost.</span>
+          </button>
+          <button id="btn-add-series-c" class="p-2 rounded-lg bg-slate-800/90 hover:bg-slate-750 border border-slate-700 text-left text-xs transition flex flex-col gap-1">
+            <span class="font-bold text-cyan-400">+ C Serie</span>
+            <span class="text-[10px] text-slate-400">Arco antiorario R</span>
+          </button>
+          <button id="btn-add-shunt-l" class="p-2 rounded-lg bg-slate-800/90 hover:bg-slate-750 border border-slate-700 text-left text-xs transition flex flex-col gap-1">
+            <span class="font-bold text-pink-400">+ L Shunt</span>
+            <span class="text-[10px] text-slate-400">Arco G costante</span>
+          </button>
+          <button id="btn-add-shunt-c" class="p-2 rounded-lg bg-slate-800/90 hover:bg-slate-750 border border-slate-700 text-left text-xs transition flex flex-col gap-1">
+            <span class="font-bold text-pink-400">+ C Shunt</span>
+            <span class="text-[10px] text-slate-400">Arco G costante</span>
+          </button>
+          <button id="btn-add-tline" class="p-2 rounded-lg bg-slate-800/90 hover:bg-slate-750 border border-slate-700 text-left text-xs transition flex flex-col gap-1 col-span-2">
+            <span class="font-bold text-emerald-400">+ Linea λ (Verso Generatore)</span>
+            <span class="text-[10px] text-slate-400">Rotazione oraria su cerchio VSWR</span>
+          </button>
+        </div>
+
+        <!-- Trajectory Steps History -->
+        <div class="flex-1 overflow-y-auto max-h-48 border border-slate-800/80 rounded-xl bg-slate-950/60 p-2 space-y-1.5 text-xs font-mono-code" id="network-steps-list">
+          <div class="text-slate-400 text-center py-4 italic">Nessun elemento aggiunto alla rete. Il cursore mostra il carico originale.</div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <footer class="border-t border-slate-900 bg-slate-950 px-5 py-3 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-4">
+      <span>Carta di Smith: <b class="text-slate-300">Piano Complesso del Coefficiente di Riflessione Γ</b></span>
+      <span class="hidden md:inline">|</span>
+      <span class="hidden md:inline">Centro: <span class="text-cyan-400">Z = Z₀ (|Γ| = 0, VSWR = 1)</span></span>
+      <span class="hidden md:inline">Bordo Destro: <span class="text-purple-400">Circuito Aperto (∞)</span></span>
+      <span class="hidden md:inline">Bordo Sinistro: <span class="text-rose-400">Cortocircuito (0)</span></span>
+    </div>
+    <div class="text-[11px] text-slate-400 font-mono-code">
+      Standard IEEE Microwave Theory & Techniques
+    </div>
+  </footer>
+
+  <script>
+    /**
+     * RF Microwave Mathematical Utilities
+     * Complex arithmetic and Smith Chart transformations
+     */
+    const SmithMath = {
+      // Convert normalized impedance z = r + jx to reflection coefficient Gamma = u + jv
+      zToGamma(r, x) {
+        const denom = (r + 1) * (r + 1) + x * x;
+        if (denom === 0) return { u: 1, v: 0, mag: 1, ang: 0 };
+        const u = (r * r + x * x - 1) / denom;
+        const v = (2 * x) / denom;
+        const mag = Math.sqrt(u * u + v * v);
+        const ang = Math.atan2(v, u); // radians
+        return { u, v, mag, ang };
+      },
+
+      // Convert reflection coefficient Gamma = u + jv to normalized impedance z = r + jx
+      gammaToZ(u, v) {
+        const denom = (1 - u) * (1 - u) + v * v;
+        if (denom < 1e-8) {
+          return { r: 99999, x: 0 }; // Open circuit representation
+        }
+        const r = (1 - u * u - v * v) / denom;
+        const x = (2 * v) / denom;
+        return { r: Math.max(0, r), x };
+      },
+
+      // Calculate VSWR from reflection magnitude
+      vswr(mag) {
+        if (mag >= 0.9999) return Infinity;
+        return (1 + mag) / (1 - mag);
+      },
+
+      // Return Loss in dB
+      returnLoss(mag) {
+        if (mag <= 1e-6) return Infinity;
+        if (mag >= 1) return 0;
+        return -20 * Math.log10(mag);
+      },
+
+      // Mismatch Loss in dB
+      mismatchLoss(mag) {
+        const pTrans = 1 - mag * mag;
+        if (pTrans <= 1e-7) return Infinity;
+        return -10 * Math.log10(pTrans);
+      },
+
+      // Impedance to Admittance: Y = 1 / Z
+      zToY(r, x) {
+        const denom = r * r + x * x;
+        if (denom === 0) return { g: Infinity, b: 0 };
+        return {
+          g: r / denom,
+          b: -x / denom
+        };
+      }
+    };
+
+    const state = {
+      z0: 50.0,
+      frequencyHz: 1e9, // 1000 MHz
+      // Current base load
+      R: 50.0,
+      X: 0.0,
+      // Layer controls
+      showZChart: true,
+      showYChart: false,
+      showVSWRCircle: true,
+      showLabels: true,
+      // Matching network chain: array of { type, value, label, zAfter, gammaAfter }
+      networkElements: [],
+      // Dragging state
+      isDragging: false
+    };
+
+    const canvas = document.getElementById('smithCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = canvas.parentElement;
+
+    // Numerical inputs & metrics
+    const z0Input = document.getElementById('z0-input');
+    const freqInput = document.getElementById('freq-input');
+    const sliderR = document.getElementById('slider-r');
+    const sliderX = document.getElementById('slider-x');
+    const numR = document.getElementById('num-r');
+    const numX = document.getElementById('num-x');
+    const sliderRVal = document.getElementById('slider-r-val');
+    const sliderXVal = document.getElementById('slider-x-val');
+    const numGammaMag = document.getElementById('num-gamma-mag');
+    const numGammaAng = document.getElementById('num-gamma-ang');
+
+    // Metrics display
+    const metricZ = document.getElementById('metric-z');
+    const metricZNorm = document.getElementById('metric-znorm');
+    const metricY = document.getElementById('metric-y');
+    const metricYNorm = document.getElementById('metric-ynorm');
+    const metricGammaMag = document.getElementById('metric-gamma-mag');
+    const metricGammaPhase = document.getElementById('metric-gamma-phase');
+    const metricVswr = document.getElementById('metric-vswr');
+    const metricRl = document.getElementById('metric-rl');
+    const metricEqComponent = document.getElementById('metric-eq-component');
+    const metricMismatch = document.getElementById('metric-mismatch');
+
+    // HUD overlays
+    const hudZ = document.getElementById('hud-z');
+    const hudGamma = document.getElementById('hud-gamma');
+    const hudVswr = document.getElementById('hud-vswr');
+    const dragTooltip = document.getElementById('drag-tooltip');
+
+    // Layer checkboxes
+    const toggleZChart = document.getElementById('toggle-z-chart');
+    const toggleYChart = document.getElementById('toggle-y-chart');
+    const toggleVSWRCircle = document.getElementById('toggle-vswr-circle');
+    const toggleLabels = document.getElementById('toggle-labels');
+
+    // Network history list
+    const networkList = document.getElementById('network-steps-list');
+
+    let chartCenter = { x: 300, y: 300 };
+    let chartRadius = 260;
+
+    function resizeCanvas() {
+      const rect = container.getBoundingClientRect();
+      const minDim = Math.min(rect.width, rect.height, 660);
+      const dpr = window.devicePixelRatio || 1;
+      
+      canvas.width = minDim * dpr;
+      canvas.height = minDim * dpr;
+      canvas.style.width = `${minDim}px`;
+      canvas.style.height = `${minDim}px`;
+
+      ctx.resetTransform?.();
+      ctx.scale(dpr, dpr);
+
+      chartCenter = { x: minDim / 2, y: minDim / 2 };
+      chartRadius = (minDim / 2) * 0.90; // Leave 10% margin for outer angle ticks
+      drawSmithChart();
+    }
+
+    // Convert complex reflection coefficient (u, v) into Canvas screen coords (px, py)
+    // Note: Smith Chart v is positive upward, canvas y is positive downward.
+    function gammaToCanvas(u, v) {
+      return {
+        x: chartCenter.x + u * chartRadius,
+        y: chartCenter.y - v * chartRadius
+      };
+    }
+
+    // Convert Canvas screen coordinates to complex reflection coefficient (u, v)
+    function canvasToGamma(px, py) {
+      const u = (px - chartCenter.x) / chartRadius;
+      const v = -(py - chartCenter.y) / chartRadius;
+      return { u, v };
+    }
+
+    const rValues = [0, 0.2, 0.5, 1.0, 2.0, 5.0];
+    const xValues = [0.2, 0.5, 1.0, 2.0, 5.0];
+
+    function drawSmithChart() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const cx = chartCenter.x;
+      const cy = chartCenter.y;
+      const R = chartRadius;
+
+      // Outer Chart Dark circular background
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+      ctx.fillStyle = '#0f172a';
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#334155';
+      ctx.stroke();
+      ctx.clip(); // Keep all internal arcs neatly clipped within unit circle
+
+      // 1. Draw Admittance Grid (Y-Chart) if activated
+      if (state.showYChart) {
+        drawAdmittanceGrid(cx, cy, R);
+      }
+
+      // 2. Draw Impedance Grid (Z-Chart) if activated
+      if (state.showZChart) {
+        drawImpedanceGrid(cx, cy, R);
+      }
+
+      // Horizontal Real Axis (X = 0 line)
+      ctx.beginPath();
+      ctx.moveTo(cx - R, cy);
+      ctx.lineTo(cx + R, cy);
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.restore(); // Exit clip
+
+      // Outer border circle
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, 0, 2 * Math.PI);
+      ctx.lineWidth = 2.0;
+      ctx.strokeStyle = '#06b6d4'; // Cyan border
+      ctx.stroke();
+
+      // Outer Phase angle scale ticks & labels around perimeter
+      drawOuterScale(cx, cy, R);
+
+      // 3. Draw VSWR Circle passing through active load
+      const normR = state.R / state.z0;
+      const normX = state.X / state.z0;
+      const curGamma = SmithMath.zToGamma(normR, normX);
+
+      if (state.showVSWRCircle && curGamma.mag > 0.005 && curGamma.mag <= 1.0) {
+        const vswrRadius = curGamma.mag * R;
+        ctx.beginPath();
+        ctx.arc(cx, cy, vswrRadius, 0, 2 * Math.PI);
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.65)'; // Amber
+        ctx.lineWidth = 1.8;
+        ctx.setLineDash([4, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // 4. Draw Matching Trajectory Path
+      drawTrajectory(cx, cy, R, curGamma);
+
+      // 5. Draw Key Landmark Points (Open, Short, Matched Center)
+      drawKeyPoints(cx, cy, R);
+
+      // 6. Draw Current Load Cursor point
+      const cursorPos = gammaToCanvas(curGamma.u, curGamma.v);
+      drawCursor(cursorPos.x, cursorPos.y);
+    }
+
+    function drawImpedanceGrid(cx, cy, R) {
+      // Resistance Circles: Center = (r/(r+1), 0), Radius = 1/(r+1) in Gamma space
+      rValues.forEach(r => {
+        const c_u = r / (r + 1);
+        const rad_u = 1 / (r + 1);
+
+        const circleCx = cx + c_u * R;
+        const circleCy = cy;
+        const circleRad = rad_u * R;
+
+        ctx.beginPath();
+        ctx.arc(circleCx, circleCy, circleRad, 0, 2 * Math.PI);
+        ctx.strokeStyle = (r === 1.0) ? 'rgba(6, 182, 212, 0.7)' : 'rgba(56, 189, 248, 0.22)';
+        ctx.lineWidth = (r === 1.0) ? 1.8 : 1.0;
+        ctx.stroke();
+
+        // Print Resistance value labels along the real axis
+        if (state.showLabels && r > 0) {
+          ctx.fillStyle = (r === 1.0) ? '#38bdf8' : '#64748b';
+          ctx.font = '10px JetBrains Mono';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          const labelX = cx + (c_u - rad_u) * R + 12;
+          ctx.fillText(`r=${r}`, labelX, cy - 3);
+        }
+      });
+
+      // Reactance Arcs: Center = (1, 1/x), Radius = 1/|x| in Gamma space
+      xValues.forEach(x => {
+        [x, -x].forEach(val => {
+          const c_u = 1;
+          const c_v = 1 / val;
+          const rad_u = 1 / Math.abs(val);
+
+          const arcCx = cx + c_u * R;
+          const arcCy = cy - c_v * R;
+          const arcRad = rad_u * R;
+
+          ctx.beginPath();
+          ctx.arc(arcCx, arcCy, arcRad, 0, 2 * Math.PI);
+          ctx.strokeStyle = (Math.abs(val) === 1.0) ? 'rgba(56, 189, 248, 0.5)' : 'rgba(56, 189, 248, 0.18)';
+          ctx.lineWidth = 1.0;
+          ctx.stroke();
+        });
+      });
+    }
+
+    function drawAdmittanceGrid(cx, cy, R) {
+      // Y-Chart is mirrored horizontally across origin: center = (-g/(g+1), 0), radius = 1/(g+1)
+      const gValues = [0.2, 0.5, 1.0, 2.0];
+      const bValues = [0.2, 0.5, 1.0, 2.0];
+
+      gValues.forEach(g => {
+        const c_u = -g / (g + 1);
+        const rad_u = 1 / (g + 1);
+
+        const circleCx = cx + c_u * R;
+        const circleCy = cy;
+        const circleRad = rad_u * R;
+
+        ctx.beginPath();
+        ctx.arc(circleCx, circleCy, circleRad, 0, 2 * Math.PI);
+        ctx.strokeStyle = (g === 1.0) ? 'rgba(244, 63, 94, 0.55)' : 'rgba(244, 63, 94, 0.2)';
+        ctx.lineWidth = 1.0;
+        ctx.setLineDash([2, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      });
+
+      bValues.forEach(b => {
+        [b, -b].forEach(val => {
+          const c_u = -1;
+          const c_v = 1 / val;
+          const rad_u = 1 / Math.abs(val);
+
+          const arcCx = cx + c_u * R;
+          const arcCy = cy - c_v * R;
+          const arcRad = rad_u * R;
+
+          ctx.beginPath();
+          ctx.arc(arcCx, arcCy, arcRad, 0, 2 * Math.PI);
+          ctx.strokeStyle = 'rgba(244, 63, 94, 0.18)';
+          ctx.lineWidth = 1.0;
+          ctx.setLineDash([2, 3]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        });
+      });
+    }
+
+    function drawOuterScale(cx, cy, R) {
+      ctx.save();
+      ctx.fillStyle = '#64748b';
+      ctx.font = '9px JetBrains Mono';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Angle ticks around perimeter (-180° to 180° every 30°)
+      for (let deg = -180; deg < 180; deg += 30) {
+        const rad = deg * (Math.PI / 180);
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+
+        // Tick mark
+        ctx.beginPath();
+        ctx.moveTo(cx + cos * R, cy - sin * R);
+        ctx.lineTo(cx + cos * (R + 6), cy - sin * (R + 6));
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Label
+        if (state.showLabels && deg % 60 === 0 && Math.abs(deg) !== 180) {
+          const lblX = cx + cos * (R + 15);
+          const lblY = cy - sin * (R + 15);
+          ctx.fillText(`${deg}°`, lblX, lblY);
+        }
+      }
+      ctx.restore();
+    }
+
+    function drawKeyPoints(cx, cy, R) {
+      const points = [
+        { name: 'Adattato (Z₀)', u: 0, v: 0, color: '#38bdf8' },
+        { name: 'Corto (0Ω)', u: -1, v: 0, color: '#f43f5e' },
+        { name: 'Aperto (∞)', u: 1, v: 0, color: '#a855f7' }
+      ];
+
+      points.forEach(pt => {
+        const pos = gammaToCanvas(pt.u, pt.v);
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, 4, 0, 2 * Math.PI);
+        ctx.fillStyle = pt.color;
+        ctx.fill();
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      });
+    }
+
+    function drawTrajectory(cx, cy, R, initialGamma) {
+      if (!state.networkElements || state.networkElements.length === 0) return;
+
+      let prevPoint = gammaToCanvas(initialGamma.u, initialGamma.v);
+
+      state.networkElements.forEach((elem, index) => {
+        const nextPoint = gammaToCanvas(elem.gammaAfter.u, elem.gammaAfter.v);
+
+        // Draw connecting vector
+        ctx.beginPath();
+        ctx.moveTo(prevPoint.x, prevPoint.y);
+        ctx.lineTo(nextPoint.x, nextPoint.y);
+        ctx.strokeStyle = '#ec4899'; // Vibrant Pink for network steps
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // Intermediate step dot
+        ctx.beginPath();
+        ctx.arc(nextPoint.x, nextPoint.y, 4.5, 0, 2 * Math.PI);
+        ctx.fillStyle = '#ec4899';
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        // Step index tag
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 9px JetBrains Mono';
+        ctx.fillText(`${index + 1}`, nextPoint.x + 8, nextPoint.y - 4);
+
+        prevPoint = nextPoint;
+      });
+    }
+
+    function drawCursor(px, py) {
+      // Glow circle
+      ctx.beginPath();
+      ctx.arc(px, py, 11, 0, 2 * Math.PI);
+      ctx.fillStyle = 'rgba(6, 182, 212, 0.25)';
+      ctx.fill();
+
+      // Outer ring
+      ctx.beginPath();
+      ctx.arc(px, py, 7, 0, 2 * Math.PI);
+      ctx.strokeStyle = '#22d3ee';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Inner dot
+      ctx.beginPath();
+      ctx.arc(px, py, 3, 0, 2 * Math.PI);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+    }
+
+    function updateMetricsAndUI() {
+      const z0 = state.z0;
+      const R = Math.max(0, state.R);
+      const X = state.X;
+
+      const normR = R / z0;
+      const normX = X / z0;
+      const gamma = SmithMath.zToGamma(normR, normX);
+      const vswrVal = SmithMath.vswr(gamma.mag);
+      const rlVal = SmithMath.returnLoss(gamma.mag);
+      const mismatchVal = SmithMath.mismatchLoss(gamma.mag);
+      const admittance = SmithMath.zToY(R, X);
+      const normY = SmithMath.zToY(normR, normX);
+      const gammaAngleDeg = gamma.ang * (180 / Math.PI);
+
+      // Equivalent reactive component at current frequency
+      const f = state.frequencyHz;
+      let eqStr = "Nessuno (Puramente Resistivo)";
+      if (Math.abs(X) > 0.05) {
+        const omega = 2 * Math.PI * f;
+        if (X > 0) {
+          const indH = X / omega;
+          const indVal = indH >= 1e-6 ? `${(indH * 1e6).toFixed(2)} µH` : `${(indH * 1e9).toFixed(2)} nH`;
+          eqStr = `Induttore: L = ${indVal}`;
+        } else {
+          const capF = 1 / (omega * Math.abs(X));
+          const capVal = capF >= 1e-9 ? `${(capF * 1e9).toFixed(2)} nF` : `${(capF * 1e12).toFixed(2)} pF`;
+          eqStr = `Condensatore: C = ${capVal}`;
+        }
+      }
+
+      // Update Dashboard elements
+      metricZ.textContent = `${R.toFixed(1)} ${X >= 0 ? '+' : '-'} j${Math.abs(X).toFixed(1)} Ω`;
+      metricZNorm.textContent = `z = ${normR.toFixed(3)} ${normX >= 0 ? '+' : '-'} j${Math.abs(normX).toFixed(3)}`;
+
+      const g_mS = admittance.g * 1000;
+      const b_mS = admittance.b * 1000;
+      metricY.textContent = `${g_mS.toFixed(2)} ${b_mS >= 0 ? '+' : '-'} j${Math.abs(b_mS).toFixed(2)} mS`;
+      metricYNorm.textContent = `y = ${normY.g.toFixed(3)} ${normY.b >= 0 ? '+' : '-'} j${Math.abs(normY.b).toFixed(3)}`;
+
+      metricGammaMag.textContent = `|Γ| = ${gamma.mag.toFixed(4)}`;
+      metricGammaPhase.textContent = `∠θ = ${gammaAngleDeg.toFixed(1)}°`;
+
+      metricVswr.textContent = `VSWR = ${vswrVal === Infinity ? '∞' : vswrVal.toFixed(2)}`;
+      metricRl.textContent = `RL = ${rlVal === Infinity ? '∞' : rlVal.toFixed(1)} dB`;
+      metricMismatch.textContent = `${mismatchVal === Infinity ? '∞' : mismatchVal.toFixed(2)} dB`;
+      metricEqComponent.textContent = eqStr;
+
+      // Update Canvas HUD
+      hudZ.textContent = `${R.toFixed(1)} ${X >= 0 ? '+' : '-'} j${Math.abs(X).toFixed(1)} Ω`;
+      hudGamma.textContent = `${gamma.mag.toFixed(3)} ∠ ${gammaAngleDeg.toFixed(1)}°`;
+      hudVswr.textContent = vswrVal === Infinity ? '∞' : vswrVal.toFixed(2);
+
+      // Sync Inputs
+      sliderR.value = Math.min(R, 300);
+      sliderRVal.textContent = `${R.toFixed(1)} Ω`;
+      numR.value = R.toFixed(1);
+
+      sliderX.value = Math.max(-250, Math.min(X, 250));
+      sliderXVal.textContent = `${X.toFixed(1)} Ω`;
+      numX.value = X.toFixed(1);
+
+      numGammaMag.value = gamma.mag.toFixed(3);
+      numGammaAng.value = Math.round(gammaAngleDeg);
+
+      // Redraw canvas
+      drawSmithChart();
+    }
+
+    function handlePointerPosition(clientX, clientY) {
+      const rect = canvas.getBoundingClientRect();
+      const px = clientX - rect.left;
+      const py = clientY - rect.top;
+
+      let { u, v } = canvasToGamma(px, py);
+      const mag = Math.sqrt(u * u + v * v);
+
+      // Constrain inside or exactly on unit circle (|Γ| <= 1.0)
+      if (mag > 1.0) {
+        u /= mag;
+        v /= mag;
+      }
+
+      // Convert back to Z
+      const zNorm = SmithMath.gammaToZ(u, v);
+      state.R = zNorm.r * state.z0;
+      state.X = zNorm.x * state.z0;
+
+      updateMetricsAndUI();
+
+      // Tooltip position
+      dragTooltip.style.left = `${px}px`;
+      dragTooltip.style.top = `${py}px`;
+      dragTooltip.style.opacity = '1';
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      state.isDragging = true;
+      canvas.setPointerCapture(e.pointerId);
+      handlePointerPosition(e.clientX, e.clientY);
+    });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (state.isDragging) {
+        handlePointerPosition(e.clientX, e.clientY);
+      }
+    });
+
+    const stopDragging = (e) => {
+      if (state.isDragging) {
+        state.isDragging = false;
+        try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+        dragTooltip.style.opacity = '0';
+      }
+    };
+    canvas.addEventListener('pointerup', stopDragging);
+    canvas.addEventListener('pointercancel', stopDragging);
+
+    sliderR.addEventListener('input', (e) => {
+      state.R = parseFloat(e.target.value);
+      updateMetricsAndUI();
+    });
+
+    sliderX.addEventListener('input', (e) => {
+      state.X = parseFloat(e.target.value);
+      updateMetricsAndUI();
+    });
+
+    numR.addEventListener('change', (e) => {
+      state.R = Math.max(0, parseFloat(e.target.value) || 0);
+      updateMetricsAndUI();
+    });
+
+    numX.addEventListener('change', (e) => {
+      state.X = parseFloat(e.target.value) || 0;
+      updateMetricsAndUI();
+    });
+
+    z0Input.addEventListener('change', (e) => {
+      state.z0 = Math.max(1, parseFloat(e.target.value) || 50);
+      updateMetricsAndUI();
+    });
+
+    freqInput.addEventListener('change', (e) => {
+      const mhz = Math.max(0.1, parseFloat(e.target.value) || 1000);
+      state.frequencyHz = mhz * 1e6;
+      updateMetricsAndUI();
+    });
+
+    // Manual Gamma inputs
+    numGammaMag.addEventListener('change', (e) => {
+      const mag = Math.min(1.0, Math.max(0, parseFloat(e.target.value) || 0));
+      const curAngRad = parseFloat(numGammaAng.value) * (Math.PI / 180);
+      const u = mag * Math.cos(curAngRad);
+      const v = mag * Math.sin(curAngRad);
+      const zNorm = SmithMath.gammaToZ(u, v);
+      state.R = zNorm.r * state.z0;
+      state.X = zNorm.x * state.z0;
+      updateMetricsAndUI();
+    });
+
+    numGammaAng.addEventListener('change', (e) => {
+      const angDeg = parseFloat(e.target.value) || 0;
+      const mag = parseFloat(numGammaMag.value) || 0;
+      const angRad = angDeg * (Math.PI / 180);
+      const u = mag * Math.cos(angRad);
+      const v = mag * Math.sin(angRad);
+      const zNorm = SmithMath.gammaToZ(u, v);
+      state.R = zNorm.r * state.z0;
+      state.X = zNorm.x * state.z0;
+      updateMetricsAndUI();
+    });
+
+    // Preset buttons
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.R = parseFloat(btn.dataset.r);
+        state.X = parseFloat(btn.dataset.x);
+        updateMetricsAndUI();
+      });
+    });
+
+    // View toggles
+    toggleZChart.addEventListener('change', (e) => {
+      state.showZChart = e.target.checked;
+      drawSmithChart();
+    });
+    toggleYChart.addEventListener('change', (e) => {
+      state.showYChart = e.target.checked;
+      drawSmithChart();
+    });
+    toggleVSWRCircle.addEventListener('change', (e) => {
+      state.showVSWRCircle = e.target.checked;
+      drawSmithChart();
+    });
+    toggleLabels.addEventListener('change', (e) => {
+      state.showLabels = e.target.checked;
+      drawSmithChart();
+    });
+
+    function getLastZ() {
+      if (state.networkElements.length === 0) {
+        return { R: state.R, X: state.X };
+      }
+      return state.networkElements[state.networkElements.length - 1].zAfter;
+    }
+
+    function addNetworkElement(type, label, calcFunc) {
+      const currentZ = getLastZ();
+      const newZ = calcFunc(currentZ);
+      const normR = newZ.R / state.z0;
+      const normX = newZ.X / state.z0;
+      const gammaAfter = SmithMath.zToGamma(normR, normX);
+
+      state.networkElements.push({
+        type,
+        label,
+        zAfter: newZ,
+        gammaAfter
+      });
+
+      renderNetworkHistory();
+      drawSmithChart();
+    }
+
+    function renderNetworkHistory() {
+      if (state.networkElements.length === 0) {
+        networkList.innerHTML = `<div class="text-slate-500 text-center py-4 italic">Nessun elemento aggiunto alla rete. Il cursore mostra il carico originale.</div>`;
+        return;
+      }
+
+      networkList.innerHTML = '';
+      state.networkElements.forEach((el, idx) => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between bg-slate-900 border border-slate-800 p-2 rounded-lg text-[11px]';
+        item.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800 flex items-center justify-center font-bold text-[10px]">${idx + 1}</span>
+            <span class="text-slate-200 font-semibold">${el.label}</span>
+          </div>
+          <div class="text-right">
+            <div class="text-cyan-300 font-semibold">${el.zAfter.R.toFixed(1)} ${el.zAfter.X >= 0 ? '+' : '-'} j${Math.abs(el.zAfter.X).toFixed(1)} Ω</div>
+            <div class="text-[10px] text-amber-300 font-mono-code">|Γ| = ${el.gammaAfter.mag.toFixed(3)}</div>
+          </div>
+        `;
+        networkList.appendChild(item);
+      });
+    }
+
+    document.getElementById('btn-add-series-l').addEventListener('click', () => {
+      addNetworkElement('series-l', '+ L Serie (+j25 Ω)', (z) => ({
+        R: z.R,
+        X: z.X + 25.0
+      }));
+    });
+
+    document.getElementById('btn-add-series-c').addEventListener('click', () => {
+      addNetworkElement('series-c', '+ C Serie (-j25 Ω)', (z) => ({
+        R: z.R,
+        X: z.X - 25.0
+      }));
+    });
+
+    document.getElementById('btn-add-shunt-l').addEventListener('click', () => {
+      addNetworkElement('shunt-l', '+ L Parallelo (Shunt -jB)', (z) => {
+        const Y = SmithMath.zToY(z.R, z.X);
+        const newY = { g: Y.g, b: Y.b - 0.015 }; // -15 mS
+        const newZ = SmithMath.zToY(newY.g, newY.b); // Inverse of Y is Z
+        return { R: newZ.g, X: newZ.b };
+      });
+    });
+
+    document.getElementById('btn-add-shunt-c').addEventListener('click', () => {
+      addNetworkElement('shunt-c', '+ C Parallelo (Shunt +jB)', (z) => {
+        const Y = SmithMath.zToY(z.R, z.X);
+        const newY = { g: Y.g, b: Y.b + 0.015 }; // +15 mS
+        const newZ = SmithMath.zToY(newY.g, newY.b);
+        return { R: newZ.g, X: newZ.b };
+      });
+    });
+
+    document.getElementById('btn-add-tline').addEventListener('click', () => {
+      // Transmission line rotates clockwise towards generator by angle beta * l
+      addNetworkElement('tline', 'Linea Tx (l = 0.125 λ / 45°)', (z) => {
+        const normR = z.R / state.z0;
+        const normX = z.X / state.z0;
+        const gamma = SmithMath.zToGamma(normR, normX);
+        // Phase shifts clockwise by -2 * beta * l (-90 degrees for 0.125 lambda)
+        const shiftedAng = gamma.ang - (Math.PI / 2);
+        const u = gamma.mag * Math.cos(shiftedAng);
+        const v = gamma.mag * Math.sin(shiftedAng);
+        const zNorm = SmithMath.gammaToZ(u, v);
+        return { R: zNorm.r * state.z0, X: zNorm.x * state.z0 };
+      });
+    });
+
+    document.getElementById('btn-clear-network').addEventListener('click', () => {
+      state.networkElements = [];
+      renderNetworkHistory();
+      drawSmithChart();
+    });
+
+    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('DOMContentLoaded', () => {
+      resizeCanvas();
+      updateMetricsAndUI();
+    });
+  </script>
+</body>
+</html>
